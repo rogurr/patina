@@ -44,6 +44,10 @@ impl Cpu for DxeCpu {
     fn get_timer_value(&self, timer_index: u32) -> Result<(u64, u64)> {
         self.0.get_timer_value(timer_index)
     }
+
+    fn cache_writeback_granule(&self) -> u32 {
+        self.0.cache_writeback_granule()
+    }
 }
 
 #[derive(IntoService)]
@@ -215,7 +219,7 @@ impl EfiCpuArchProtocolImpl {
                 get_timer_value,
                 set_memory_attributes,
                 number_of_timers: 0,
-                dma_buffer_alignment: 0,
+                dma_buffer_alignment: cpu.cache_writeback_granule(),
             },
 
             // private data
@@ -271,6 +275,7 @@ mod tests {
             ) -> Result<()>;
             fn init(&self, init_type: CpuInitType) -> Result<()>;
             fn get_timer_value(&self, timer_index: u32) -> Result<(u64, u64)>;
+            fn cache_writeback_granule(&self) -> u32;
         }
     }
 
@@ -352,6 +357,7 @@ mod tests {
         with_locked_state(|| {
             let mut cpu_init = MockEfiCpuInit::new();
             cpu_init.expect_init().with(always()).returning(|_| Ok(()));
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
             let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
 
             let mut im: Service<dyn InterruptManager> = Service::mock(Box::new(MockInterruptManager::new()));
