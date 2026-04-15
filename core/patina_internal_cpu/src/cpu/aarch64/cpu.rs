@@ -35,12 +35,8 @@ impl EfiCpuAarch64 {
 
         loop {
             match _op {
-                CpuFlushType::EfiCpuFlushTypeWriteBack => {
-                    self.clean_data_entry_by_mva(aligned_addr)
-                }
-                CpuFlushType::EfiCpuFlushTypeInvalidate => {
-                    self.invalidate_data_cache_entry_by_mva(aligned_addr)
-                }
+                CpuFlushType::EfiCpuFlushTypeWriteBack => self.clean_data_entry_by_mva(aligned_addr),
+                CpuFlushType::EfiCpuFlushTypeInvalidate => self.invalidate_data_cache_entry_by_mva(aligned_addr),
                 CpuFlushType::EfiCpuFlushTypeWriteBackInvalidate => {
                     self.clean_and_invalidate_data_entry_by_mva(aligned_addr)
                 }
