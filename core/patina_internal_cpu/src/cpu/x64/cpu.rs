@@ -232,4 +232,10 @@ mod tests {
         assert_eq!(x64_cpu_init.get_timer_value(1), Err(EfiError::InvalidParameter));
         assert_eq!(x64_cpu_init.get_timer_value(0), Ok((0, 0)));
     }
+
+    #[test]
+    fn test_cache_writeback_granule() {
+        let x64_cpu_init = EfiCpuX64 { timer_period: 0 };
+        assert_eq!(x64_cpu_init.cache_writeback_granule(), 64);
+    }
 }

@@ -206,4 +206,11 @@ mod tests {
         assert_eq!(cpu_init.get_timer_value(1), Err(EfiError::Unsupported));
         assert_eq!(cpu_init.get_timer_value(0), Err(EfiError::Unsupported));
     }
+
+    #[test]
+    fn test_cache_writeback_granule() {
+        let cpu_init = EfiCpuAarch64;
+        let granule = cpu_init.cache_writeback_granule();
+        assert!(granule >= 64);
+    }
 }
