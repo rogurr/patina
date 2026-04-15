@@ -303,6 +303,7 @@ mod tests {
     fn test_flush_data_cache() {
         with_locked_state(|| {
             let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
             cpu_init.expect_flush_data_cache().with(eq(0), eq(0), always()).returning(|_, _, _| Ok(()));
             let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
 
@@ -318,7 +319,9 @@ mod tests {
     #[test]
     fn test_enable_interrupt() {
         with_locked_state(|| {
-            let cpu: Service<dyn Cpu> = Service::mock(Box::new(MockEfiCpuInit::new()));
+            let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
+            let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
             let im: Service<dyn InterruptManager> = Service::mock(Box::new(MockInterruptManager::new()));
             let protocol = EfiCpuArchProtocolImpl::new(cpu, im);
 
@@ -330,7 +333,9 @@ mod tests {
     #[test]
     fn test_disable_interrupt() {
         with_locked_state(|| {
-            let cpu: Service<dyn Cpu> = Service::mock(Box::new(MockEfiCpuInit::new()));
+            let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
+            let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
             let im: Service<dyn InterruptManager> = Service::mock(Box::new(MockInterruptManager::new()));
             let protocol = EfiCpuArchProtocolImpl::new(cpu, im);
 
@@ -342,7 +347,9 @@ mod tests {
     #[test]
     fn test_get_interrupt_state() {
         with_locked_state(|| {
-            let cpu: Service<dyn Cpu> = Service::mock(Box::new(MockEfiCpuInit::new()));
+            let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
+            let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
             let im: Service<dyn InterruptManager> = Service::mock(Box::new(MockInterruptManager::new()));
             let protocol = EfiCpuArchProtocolImpl::new(cpu, im);
 
@@ -374,7 +381,9 @@ mod tests {
     #[test]
     fn test_register_interrupt_handler() {
         with_locked_state(|| {
-            let cpu: Service<dyn Cpu> = Service::mock(Box::new(MockEfiCpuInit::new()));
+            let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
+            let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
 
             let mut interrupt_manager = MockInterruptManager::new();
             interrupt_manager
@@ -394,6 +403,7 @@ mod tests {
     fn test_get_timer_value() {
         with_locked_state(|| {
             let mut cpu_init = MockEfiCpuInit::new();
+            cpu_init.expect_cache_writeback_granule().return_const(64_u32);
             cpu_init.expect_get_timer_value().with(eq(0)).returning(|_| Ok((0, 0)));
             let cpu: Service<dyn Cpu> = Service::mock(Box::new(cpu_init));
 
@@ -434,6 +444,15 @@ mod tests {
             let dxe_cpu = DxeCpu(EfiCpu::default());
             let result = dxe_cpu.get_timer_value(0);
             assert_eq!(result.unwrap(), (0, 0));
+        });
+    }
+
+    #[test]
+    fn test_dxe_cpu_cache_writeback_granule_delegates() {
+        with_locked_state(|| {
+            let dxe_cpu = DxeCpu(EfiCpu::default());
+            let granule = dxe_cpu.cache_writeback_granule();
+            assert!(granule >= 64u32);
         });
     }
 
