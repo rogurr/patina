@@ -7,7 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use crate::cpu::Cpu;
-#[cfg(all(not(test), target_arch = "aarch64"))]
+#[cfg(not(test))]
 use core::arch::asm;
 use patina::{
     error::EfiError,
