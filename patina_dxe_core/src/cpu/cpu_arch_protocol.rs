@@ -447,6 +447,15 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_dxe_cpu_cache_writeback_granule_delegates() {
+        with_locked_state(|| {
+            let dxe_cpu = DxeCpu(EfiCpu::default());
+            let granule = dxe_cpu.cache_writeback_granule();
+            assert!(granule == 64u32);
+        });
+    }
+
     // Tests for DxeInterruptManager delegation
     #[test]
     fn test_dxe_interrupt_manager_register_then_unregister_delegates() {
