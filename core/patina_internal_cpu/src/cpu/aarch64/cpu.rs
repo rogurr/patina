@@ -15,6 +15,9 @@ use patina::{
 };
 use r_efi::efi;
 
+#[cfg(not(target_arch = "aarch64"))]
+    compile_error!("This file only supports aarch64");
+
 /// Struct to implement AArch64 Cpu Init.
 ///
 /// This struct cannot be used directly. It replaces the `EfiCpu` struct when compiling for the AArch64 architecture.
@@ -27,6 +30,7 @@ impl EfiCpuAarch64 {
     pub fn initialize(&mut self) -> Result<(), EfiError> {
         Ok(())
     }
+
     // AArch64 related cache functions
     fn cache_range_operation(&self, _start: efi::PhysicalAddress, _length: u64, _op: CpuFlushType) {
         let cacheline_alignment = self.data_cache_line_len() - 1;
@@ -48,75 +52,63 @@ impl EfiCpuAarch64 {
             }
         }
 
-        #[cfg(all(not(test), target_arch = "aarch64"))]
-        {
-            // we have a data barrier after all cache lines have had the operation performed on them as an optimization
-            // SAFETY: a data barrier has no impact on safety invariants.
-            unsafe {
-                asm!("dsb sy", options(nostack));
-            }
+        #[cfg(not(test))]
+        // we have a data barrier after all cache lines have had the operation performed on them as an optimization
+        // SAFETY: a data barrier has no impact on safety invariants.
+        unsafe {
+            asm!("dsb sy", options(nostack));
         }
     }
 
     fn clean_data_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(all(not(test), target_arch = "aarch64"))]
-        {
-            // SAFETY: Cleaning the data cache has no impact on safety invariants.
-            unsafe {
-                asm!("dc cvac, {}", in(reg) _mva, options(nostack, preserves_flags));
-            }
+        #[cfg(not(test))]
+        // SAFETY: Cleaning the data cache has no impact on safety invariants.
+        unsafe {
+            asm!("dc cvac, {}", in(reg) _mva, options(nostack, preserves_flags));
         }
     }
 
     fn invalidate_data_cache_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(all(not(test), target_arch = "aarch64"))]
-        {
-            // SAFETY: Invalidating the data cache does not impact safety checks. It
-            // does have the potential to corrupt memory if used incorrectly, but the caller is
-            // expected to ensure that they are using this function correctly.
-            unsafe {
-                asm!("dc ivac, {}", in(reg) _mva, options(nostack, preserves_flags));
-            }
+        #[cfg(not(test))]
+        // SAFETY: Invalidating the data cache does not impact safety checks. It
+        // does have the potential to corrupt memory if used incorrectly, but the caller is
+        // expected to ensure that they are using this function correctly.
+        unsafe {
+            asm!("dc ivac, {}", in(reg) _mva, options(nostack, preserves_flags));
         }
     }
 
     fn clean_and_invalidate_data_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(all(not(test), target_arch = "aarch64"))]
-        {
-            // SAFETY: Cleaning and invalidating the data cache does not impact safety invariants.
-            unsafe {
-                asm!("dc civac, {}", in(reg) _mva, options(nostack, preserves_flags));
-            }
+        #[cfg(not(test))]
+        // SAFETY: Cleaning and invalidating the data cache does not impact safety invariants.
+        unsafe {
+            asm!("dc civac, {}", in(reg) _mva, options(nostack, preserves_flags));
         }
     }
 
     fn data_cache_line_len(&self) -> u64 {
-        cfg_if::cfg_if! {
-            if #[cfg(all(not(test), target_arch = "aarch64"))]  {
-                // SAFETY: Reading ctr_el0 has no impact on safety invariants.
-                let ctr_el0 = unsafe {
-                    let ctr_el0: u64;
-                    asm!("mrs {}, ctr_el0", out(reg) ctr_el0);
-                    ctr_el0
-                };
-                4 << ((ctr_el0 >> 16) & 0xf)
-            } else {
-                // For test mode or non-aarch64 platforms, return 64 bytes
-                64_u64
-            }
-        }
+        #[cfg(test)]
+        let ctr_el0 = 0x0004_0000; // Provides line size of 64 in test mode
+
+        #[cfg(not(test))]
+        // SAFETY: Reading ctr_el0 has no impact on safety invariants
+        let ctr_el0 = unsafe {
+            let ctr_el0: u64;
+            asm!("mrs {}, ctr_el0", out(reg) ctr_el0);
+            ctr_el0
+        };
+
+        4 << ((ctr_el0 >> 16) & 0xf)
     }
 
     /// Causes the CPU to enter a low power state until the next interrupt.
     // This routine only does bare-metal hardware access, so no coverage.
     #[coverage(off)]
     pub fn sleep() {
-        #[cfg(all(not(test), target_arch = "aarch64"))]
-        {
-            // SAFETY: The caller is expected to ensure that they want to wait for an interrupt
-            unsafe {
-                asm!("wfi", options(nostack));
-            }
+        #[cfg(not(test))]
+        // SAFETY: The caller is expected to ensure that they want to wait for an interrupt
+        unsafe {
+            asm!("wfi", options(nostack));
         }
     }
 }
@@ -141,29 +133,25 @@ impl Cpu for EfiCpuAarch64 {
     }
 
     fn cache_writeback_granule(&self) -> u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(all(not(test), target_arch = "aarch64"))] {
+        #[cfg(not(test))]
+        // SAFETY: CTR_EL0 is a read-only system register accessible at all exception levels
+        let ctr_el0 = unsafe {
+            let ctr_el0: u64;
+            asm!("mrs {}, ctr_el0", out(reg) ctr_el0);
+            ctr_el0
+        };
 
-                // SAFETY: CTR_EL0 is a read-only system register accessible at all exception levels
-                let ctr_el0 = unsafe {
-                    let ctr_el0: u64;
-                    asm!("mrs {}, ctr_el0", out(reg) ctr_el0);
-                    ctr_el0
-                };
+        #[cfg(test)]
+        let ctr_el0 = 0x0400_0000; // Provides granule of 64 in test mode
 
-                // CWG (Cache Writeback Granule): CTR_EL0 bits [27:24]
-                let cwg = ((ctr_el0 >> 24) & 0xF) as u32;
+        // CWG (Cache Writeback Granule): CTR_EL0 bits [27:24]
+        let cwg = ((ctr_el0 >> 24) & 0xF) as u32;
 
-                // CWG is Log2 of the max size in words
-                if cwg > 0 {
-                    4 << cwg
-                } else {
-                    2048  // Default to 2K if register contains 0 per Armv8-A spec
-                }
-            } else {
-                // For test mode or non-aarch64 platforms, return 64 bytes
-                64_u32
-            }
+        // CWG is Log2 of the max size in words
+        if cwg > 0 {
+            4 << cwg
+        } else {
+            patina::base::SIZE_2KB as u32 // Default to 2K if register contains 0 per Armv8-A spec
         }
     }
 }
@@ -211,6 +199,6 @@ mod tests {
     fn test_cache_writeback_granule() {
         let cpu_init = EfiCpuAarch64;
         let granule = cpu_init.cache_writeback_granule();
-        assert!(granule >= 64);
+        assert!(granule == 64);
     }
 }
