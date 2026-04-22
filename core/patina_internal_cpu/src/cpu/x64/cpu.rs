@@ -17,9 +17,6 @@ use patina::{
 };
 use r_efi::efi;
 
-#[cfg(not(target_arch = "x86_64"))]
-compile_error!("This file only supports x86_64");
-
 pub const CACHE_WRITEBACK_GRANULE: u32 = 4; // Using 4 bytes following precedence set by Tianocore
 
 /// Struct to implement X64 Cpu Init.

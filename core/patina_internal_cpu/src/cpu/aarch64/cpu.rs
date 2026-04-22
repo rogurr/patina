@@ -15,9 +15,6 @@ use patina::{
 };
 use r_efi::efi;
 
-#[cfg(not(target_arch = "aarch64"))]
-compile_error!("This file only supports aarch64");
-
 /// Struct to implement AArch64 Cpu Init.
 ///
 /// This struct cannot be used directly. It replaces the `EfiCpu` struct when compiling for the AArch64 architecture.
